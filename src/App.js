@@ -10,7 +10,7 @@ function App() {
       <Helmet>
         <meta charSet="utf-8" />
         <title>Pathfindr</title>
-        <link rel="canonical" href= "" />
+        <link rel="canonical" href= "https://esypathfindr.netlify.app/" />
       </Helmet>
       <Navbar/>
       <PathfindingVisualizer/>
