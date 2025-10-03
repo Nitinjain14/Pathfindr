@@ -2,6 +2,16 @@
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
+## 📦 Installation & Setup
+
+Clone the repo and install dependencies:
+
+```bash
+https://github.com/Nitinjain14/Pathfindr
+npm install
+npm start
+```
+
 ## Available Scripts
 
 In the project directory, you can run:
@@ -39,3 +49,32 @@ Instead, it will copy all the configuration files and the transitive dependencie
 
 You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
 
+## 🧮 Algorithms Implemented
+
+### 1. Dijkstra’s Algorithm
+- ✅ Works with non-negative weights
+- ✅ Greedy algorithm: always picks the closest unvisited node
+- ⏱ Time Complexity: O(E log V) with a binary heap
+- 🏆 Best when: Graph has non-negative edges and you want guaranteed optimal shortest path
+
+### 2. Bellman-Ford Algorithm
+- ✅ Works with negative weights (but not negative cycles)
+- ✅ Iteratively relaxes all edges up to V-1 times
+- ⏱ Time Complexity: O(V·E) (slower than Dijkstra)
+- 🏆 Best when: Graph may have negative weights (e.g., financial models, currency exchange rates)
+
+### 3. A* Search (A-Star)
+- ✅ Uses a heuristic (Manhattan distance here) to guide the search
+- ✅ Much faster in practice since it explores fewer nodes
+- ⏱ Time Complexity: O(E) in the best case, worst case same as Dijkstra (O(E log V))
+- 🏆 Best when: You have a grid or spatial map (like games, maps) and a good heuristic
+
+---
+
+## ⚖️ Comparison Table
+
+| Algorithm       | Handles Negative Weights | Time Complexity               | Use Case                                |
+|-----------------|------------------------|-------------------------------|----------------------------------------|
+| Dijkstra        | ❌ No                  | O(E log V)                     | General graphs with non-negative edges |
+| Bellman-Ford    | ✅ Yes                 | O(V·E)                         | Graphs with negative edge weights      |
+| A*              | ❌ No (with default heuristic) | O(E) best, O(E log V) worst | Grids, maps, pathfinding with heuristics |
