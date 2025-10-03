@@ -1,7 +1,9 @@
+// PathfindingVisualizer.jsx
 import React, { Component } from 'react';
 import Node from '../components/Node';
 import { dijkstra, getNodesInShortestPathOrder } from '../algorithm/dijkstra';
 import { bellmanFord } from '../algorithm/bellmanford';
+import { aStar } from '../algorithm/astar';
 
 import './pathFindingVisualizer.css';
 
@@ -17,8 +19,8 @@ export default class PathfindingVisualizer extends Component {
       finishNodeCol: 39,
       cost: 0,
       showCost: false,
-      selectedAlgorithm: "dijkstra", // default selection
-      executionTime: 0, // store algo execution time
+      selectedAlgorithm: 'dijkstra',
+      executionTime: 0,
     };
   }
 
@@ -27,6 +29,7 @@ export default class PathfindingVisualizer extends Component {
     this.setState({ grid });
   }
 
+  // --- Mouse handlers ---
   handleMouseDown(row, col) {
     const newGrid = this.getNewGridWithWallToggled(this.state.grid, row, col);
     this.setState({ grid: newGrid, mouseIsPressed: true });
@@ -42,7 +45,8 @@ export default class PathfindingVisualizer extends Component {
     this.setState({ mouseIsPressed: false });
   }
 
-  animatePathfinding(visitedNodesInOrder, nodesInShortestPathOrder) {
+  // --- Animation helpers ---
+  animateVisitedNodes(visitedNodesInOrder, nodesInShortestPathOrder) {
     for (let i = 0; i <= visitedNodesInOrder.length; i++) {
       if (i === visitedNodesInOrder.length) {
         setTimeout(() => {
@@ -52,8 +56,8 @@ export default class PathfindingVisualizer extends Component {
       }
       setTimeout(() => {
         const node = visitedNodesInOrder[i];
-        document.getElementById(`node-${node.row}-${node.col}`).className =
-          'node node-visited';
+        const el = document.getElementById(`node-${node.row}-${node.col}`);
+        if (el) el.className = 'node node-visited';
       }, 10 * i);
     }
   }
@@ -63,8 +67,8 @@ export default class PathfindingVisualizer extends Component {
     for (let i = 0; i < nodesInShortestPathOrder.length; i++) {
       setTimeout(() => {
         const node = nodesInShortestPathOrder[i];
-        document.getElementById(`node-${node.row}-${node.col}`).className =
-          'node node-shortest-path';
+        const el = document.getElementById(`node-${node.row}-${node.col}`);
+        if (el) el.className = 'node node-shortest-path';
       }, 20 * i);
       finalTime = i;
     }
@@ -73,40 +77,74 @@ export default class PathfindingVisualizer extends Component {
     }, 20 * finalTime + 500);
   }
 
-  visualizeAlgorithm() {
-    const { grid, startNodeRow, startNodeCol, finishNodeRow, finishNodeCol, selectedAlgorithm } = this.state;
-    const startNode = grid[startNodeRow][startNodeCol];
-    const finishNode = grid[finishNodeRow][finishNodeCol];
-
-    let visitedNodesInOrder = [];
-    let nodesInShortestPathOrder = [];
-
-    const t0 = performance.now(); // start timer
-
-    if (selectedAlgorithm === "dijkstra") {
-      visitedNodesInOrder = dijkstra(grid, startNode, finishNode);
-      nodesInShortestPathOrder = getNodesInShortestPathOrder(finishNode);
-    } else if (selectedAlgorithm === "bellman-ford") {
-      visitedNodesInOrder = bellmanFord(grid, startNode, finishNode);
-      nodesInShortestPathOrder = getNodesInShortestPathOrder(finishNode);
+  // Reset node properties on the grid (returns a fresh-deep-copied grid)
+  createFreshGridFrom(grid) {
+    const newGrid = [];
+    for (let r = 0; r < grid.length; r++) {
+      const currentRow = [];
+      for (let c = 0; c < grid[0].length; c++) {
+        const node = grid[r][c];
+        currentRow.push({
+          ...node,
+          distance: Infinity,
+          isVisited: false,
+          previousNode: null,
+          // Clear any algorithm-specific helper properties (g/f) if present
+          g: Infinity,
+          f: Infinity,
+        });
+      }
+      newGrid.push(currentRow);
     }
-
-    const t1 = performance.now(); // end timer
-    const execTime = (t1 - t0).toFixed(2);
-
-    this.setState({ cost: nodesInShortestPathOrder.length, executionTime: execTime });
-    this.animatePathfinding(visitedNodesInOrder, nodesInShortestPathOrder);
+    return newGrid;
   }
 
+  // Main orchestrator: reset grid, run chosen algorithm, measure time, animate
+  visualizeAlgorithm() {
+    const { grid, startNodeRow, startNodeCol, finishNodeRow, finishNodeCol, selectedAlgorithm } = this.state;
+
+    // 1) create a fresh grid and update state so Node components reflect fresh state
+    const freshGrid = this.createFreshGridFrom(grid);
+    this.setState({ grid: freshGrid, showCost: false, cost: 0 }, () => {
+      const startNode = freshGrid[startNodeRow][startNodeCol];
+      const finishNode = freshGrid[finishNodeRow][finishNodeCol];
+
+      let visitedNodesInOrder = [];
+      let nodesInShortestPathOrder = [];
+
+      const t0 = performance.now();
+
+      if (selectedAlgorithm === 'dijkstra') {
+        visitedNodesInOrder = dijkstra(freshGrid, startNode, finishNode);
+        nodesInShortestPathOrder = getNodesInShortestPathOrder(finishNode);
+      } else if (selectedAlgorithm === 'bellman-ford') {
+        visitedNodesInOrder = bellmanFord(freshGrid, startNode, finishNode);
+        nodesInShortestPathOrder = getNodesInShortestPathOrder(finishNode);
+      } else if (selectedAlgorithm === 'astar' || selectedAlgorithm === 'a*') {
+        visitedNodesInOrder = aStar(freshGrid, startNode, finishNode);
+        nodesInShortestPathOrder = getNodesInShortestPathOrder(finishNode);
+      }
+
+      const t1 = performance.now();
+      const execTime = (t1 - t0).toFixed(2);
+
+      // cost: length of path (nodes count) if path exists, otherwise 0
+      const pathCost = nodesInShortestPathOrder.length > 0 ? nodesInShortestPathOrder.length : 0;
+
+      this.setState({ cost: pathCost, executionTime: execTime }, () => {
+        this.animateVisitedNodes(visitedNodesInOrder, nodesInShortestPathOrder);
+      });
+    });
+  }
+
+  // --- Grid creation / helpers ---
   getInitialGrid() {
     const { startNodeRow, startNodeCol, finishNodeRow, finishNodeCol } = this.state;
     const grid = [];
     for (let row = 0; row < 15; row++) {
       const currentRow = [];
       for (let col = 0; col < 40; col++) {
-        currentRow.push(
-          this.createNode(col, row, startNodeRow, startNodeCol, finishNodeRow, finishNodeCol)
-        );
+        currentRow.push(this.createNode(col, row, startNodeRow, startNodeCol, finishNodeRow, finishNodeCol));
       }
       grid.push(currentRow);
     }
@@ -123,11 +161,13 @@ export default class PathfindingVisualizer extends Component {
       isVisited: false,
       isWall: false,
       previousNode: null,
+      g: Infinity,
+      f: Infinity,
     };
   }
 
   getNewGridWithWallToggled(grid, row, col) {
-    const newGrid = grid.slice();
+    const newGrid = grid.slice().map(r => r.slice()); // shallow copy rows
     const node = newGrid[row][col];
     const newNode = {
       ...node,
@@ -138,16 +178,18 @@ export default class PathfindingVisualizer extends Component {
   }
 
   handleStartEndChanges() {
-    this.componentDidMount();
+    // re-create initial grid so start/finish nodes update
+    const grid = this.getInitialGrid();
+    this.setState({ grid, showCost: false, cost: 0, executionTime: 0 });
   }
 
+  // --- Render ---
   render() {
     const { grid, mouseIsPressed, startNodeRow, startNodeCol, finishNodeRow, finishNodeCol, showCost, cost, selectedAlgorithm, executionTime } = this.state;
 
     return (
       <div className=' bg-gray-900 text-gray-200 font-mono'>
         <div className=' px-16 py-2'>
-          {/* Start/Finish Input Controls */}
           <div className=' p-5 flex justify-between'>
             <div>
               <label>Start Node Row: </label>
@@ -155,7 +197,15 @@ export default class PathfindingVisualizer extends Component {
                 className=' bg-slate-800 text-gray-200 px-2 py-1 rounded-md'
                 type="number"
                 value={startNodeRow}
-                onChange={(e) => this.setState({ startNodeRow: Math.max(0, Math.min(14, parseInt(e.target.value))) })}
+                onChange={(e) => {
+                  let value = parseInt(e.target.value);
+                  if (Number.isNaN(value)) value = 0;
+                  const minValue = 0;
+                  const maxValue = 14;
+                  if (value < minValue) value = minValue;
+                  else if (value > maxValue) value = maxValue;
+                  this.setState({ startNodeRow: value });
+                }}
               />
             </div>
             <div>
@@ -164,7 +214,15 @@ export default class PathfindingVisualizer extends Component {
                 className=' bg-slate-800 text-gray-200 px-2 py-1 rounded-md'
                 type="number"
                 value={startNodeCol}
-                onChange={(e) => this.setState({ startNodeCol: Math.max(0, Math.min(39, parseInt(e.target.value))) })}
+                onChange={(e) => {
+                  let value = parseInt(e.target.value);
+                  if (Number.isNaN(value)) value = 0;
+                  const minValue = 0;
+                  const maxValue = 39;
+                  if (value < minValue) value = minValue;
+                  else if (value > maxValue) value = maxValue;
+                  this.setState({ startNodeCol: value });
+                }}
               />
             </div>
           </div>
@@ -176,7 +234,15 @@ export default class PathfindingVisualizer extends Component {
                 className=' bg-slate-800 text-gray-200 px-2 py-1 rounded-md'
                 type="number"
                 value={finishNodeRow}
-                onChange={(e) => this.setState({ finishNodeRow: Math.max(0, Math.min(14, parseInt(e.target.value))) })}
+                onChange={(e) => {
+                  let value = parseInt(e.target.value);
+                  if (Number.isNaN(value)) value = 0;
+                  const minValue = 0;
+                  const maxValue = 14;
+                  if (value < minValue) value = minValue;
+                  else if (value > maxValue) value = maxValue;
+                  this.setState({ finishNodeRow: value });
+                }}
               />
             </div>
             <div>
@@ -185,12 +251,19 @@ export default class PathfindingVisualizer extends Component {
                 className=' bg-slate-800 text-gray-200 px-2 py-1 rounded-md'
                 type="number"
                 value={finishNodeCol}
-                onChange={(e) => this.setState({ finishNodeCol: Math.max(0, Math.min(39, parseInt(e.target.value))) })}
+                onChange={(e) => {
+                  let value = parseInt(e.target.value);
+                  if (Number.isNaN(value)) value = 0;
+                  const minValue = 0;
+                  const maxValue = 39;
+                  if (value < minValue) value = minValue;
+                  else if (value > maxValue) value = maxValue;
+                  this.setState({ finishNodeCol: value });
+                }}
               />
             </div>
           </div>
 
-          {/* Dropdown to choose algorithm */}
           <div className=' px-5 mb-10 text-center'>
             <label className="mr-3">Select Algorithm: </label>
             <select
@@ -200,9 +273,11 @@ export default class PathfindingVisualizer extends Component {
             >
               <option value="dijkstra">Dijkstra</option>
               <option value="bellman-ford">Bellman-Ford</option>
+              <option value="astar">A*</option>
             </select>
+
             <button
-              className=' ml-10 py-2 px-6 text-xl rounded-md bg-slate-800 text-gray-200'
+              className=' ml-6 py-2 px-6 text-xl rounded-md bg-slate-800 text-gray-200'
               onClick={() => this.handleStartEndChanges()}
             >
               Apply
@@ -214,11 +289,10 @@ export default class PathfindingVisualizer extends Component {
           <p className=' italic text-sm'>Click and drag to create walls.</p>
         </div>
 
-        {/* Grid Rendering */}
         <div className=' px-20 text-center'>
           {grid.map((row, rowIdx) => {
             return (
-              <div key={rowIdx}>
+              <div key={rowIdx} style={{ height: 20 }}>
                 {row.map((node, nodeIdx) => {
                   const { row, col, isFinish, isStart, isWall } = node;
                   return (
@@ -229,11 +303,11 @@ export default class PathfindingVisualizer extends Component {
                       isStart={isStart}
                       isWall={isWall}
                       mouseIsPressed={mouseIsPressed}
-                      onMouseDown={(row, col) => this.handleMouseDown(row, col)}
-                      onMouseEnter={(row, col) => this.handleMouseEnter(row, col)}
+                      onMouseDown={(r, c) => this.handleMouseDown(r, c)}
+                      onMouseEnter={(r, c) => this.handleMouseEnter(r, c)}
                       onMouseUp={() => this.handleMouseUp()}
                       row={row}
-                    ></Node>
+                    />
                   );
                 })}
               </div>
@@ -241,31 +315,25 @@ export default class PathfindingVisualizer extends Component {
           })}
         </div>
 
-        {/* Results Section */}
         <div className=' text-gray-200 text-xl text-center pt-8 max-w-lg mx-auto'>
           {showCost && (
             cost > 1 ? (
-              <p>
-                The cost of the shortest path is {this.state.cost}.{' '}
-                <span className=' text-xs italic'>
-                  Considering each node's weight to be 1
-                </span>
-                <br />
-                Execution Time: {executionTime} ms
-              </p>
+              <div>
+                <p>The cost of the shortest path is {cost}. <span className=' text-xs italic'> Considering each node's weight to be 1</span></p>
+                <p className=' text-sm mt-2'>Execution Time: {executionTime} ms ({selectedAlgorithm})</p>
+              </div>
             ) : (
               <p>There doesn't exist any path.</p>
             )
           )}
         </div>
 
-        {/* Visualization Button */}
         <div className=' text-center py-8'>
           <button
             className=' px-10 py-5 bg-teal-600 rounded-md'
             onClick={() => this.visualizeAlgorithm()}
           >
-            Visualize {selectedAlgorithm === "dijkstra" ? "Dijkstra's Algorithm" : "Bellman-Ford Algorithm"}
+            Visualize {selectedAlgorithm === 'dijkstra' ? "Dijkstra's Algorithm" : selectedAlgorithm === 'bellman-ford' ? 'Bellman-Ford' : 'A*'}
           </button>
         </div>
       </div>
