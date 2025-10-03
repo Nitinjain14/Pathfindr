@@ -10,8 +10,8 @@ function App() {
     <>
       <Helmet>
         <meta charSet="utf-8" />
-        <title>Pathfinder</title>
-        <link rel="canonical" href="https://pathfinder-badal-chowdharys-projects.vercel.app/" />
+        <title>Pathfindr</title>
+        <link rel="canonical" href= "" />
       </Helmet>
       <Navbar/>
       <PathfindingVisualizer/>
